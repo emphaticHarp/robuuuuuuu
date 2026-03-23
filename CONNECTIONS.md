@@ -11,7 +11,7 @@
 | CH1 | 34 | D34 | Steering Control | PWM Input (1000-2000µs) |
 | CH2 | 35 | D35 | Throttle Control | PWM Input (1000-2000µs) |
 | CH5 | 15 | D15 | LED 3-Position Toggle | PWM Input (1000-2000µs) |
-| CH6 | 16 | D4 | LED On/Off Toggle | PWM Input (1000-2000µs) |
+| CH6 | 4 | D4 | LED On/Off Toggle | PWM Input (1000-2000µs) |
 
 **Note:** Receiver GND must be connected to ESP32 GND
 
@@ -53,10 +53,10 @@ The L298N module has the following pins:
 
 | LED Name | GPIO | D-Pin | Function | Control Type | Behavior |
 |----------|------|-------|----------|--------------|----------|
-| LEFT_LED | 13 | D13 | Left Blink LED | Digital ON/OFF | Blinks (500ms) when CH5=UP |
-| RIGHT_LED | 2 | D2 | Right Blink LED | Digital ON/OFF | Blinks (500ms) when CH5=DOWN |
-| CH6_LED | 19 | D19 | Toggle LED | Digital ON/OFF | ON when CH6>1750µs, OFF otherwise |
-| BRIGHTNESS_LED | 5 | D18 | Brightness LED | PWM (LEDC Ch2) | 100% = stopped, 60% = moving |
+| LEFT_LED | 23 | D23 | Left Blink LED | Digital ON/OFF | Blinks (500ms) when CH5=UP |
+| RIGHT_LED | 21 | D21 | Right Blink LED | Digital ON/OFF | Blinks (500ms) when CH5=DOWN |
+| CH6_LED | 22 | D22 | Toggle LED | Digital ON/OFF | ON when CH6>1750µs, OFF otherwise |
+| BRIGHTNESS_LED | 5 | D5 | Brightness LED | PWM (LEDC Ch2) | 100% = stopped, 60% = moving |
 
 **Motor Wiring:**
 - Connect ESP32 GND to L298N GND (common ground)
@@ -127,7 +127,8 @@ The L298N module has the following pins:
 
 **LED Output Pins (4):**
 - D13 (Left LED)
-- D2 (Right LED)
+- D13 (Left LED)
+- D21 (Right LED)
 - D19 (CH6 Toggle LED)
 - D18 (Brightness LED - PWM)
 
@@ -142,14 +143,11 @@ The L298N module has the following pins:
 
 | GPIO | D-Pin | Function |
 |------|-------|----------|
-| 2 | D2 | RIGHT_LED output |
 | 4 | D4 | CH6 receiver input |
-| 5 | D18 | BRIGHTNESS_LED PWM output |
-| 15 | D15 | CH5 receiver input |
-| 13 | D13 | LEFT_LED output |
-| 14 | D14 | Motor IN4 output |
-| 16 | D4 | CH6 receiver input |
-| 19 | D19 | CH6_LED output |
+| 5 | D5 | BRIGHTNESS_LED PWM output |
+| 21 | D21 | RIGHT_LED output |
+| 22 | D22 | CH6_LED output |
+| 23 | D23 | LEFT_LED output |
 | 25 | D25 | Motor IN1 output |
 | 26 | D26 | Motor IN2 output |
 | 27 | D27 | Motor IN3 output |
@@ -184,7 +182,7 @@ RC RECEIVER
   CH1 → D34 (GPIO34) → Steering Input
   CH2 → D35 (GPIO35) → Throttle Input
   CH5 → D15 (GPIO15) → LED Toggle Input
-  CH6 → D4  (GPIO16) → LED On/Off Input
+  CH6 → D4  (GPIO4)  → LED On/Off Input
   GND → GND (Common Ground)
 
 L298N MOTOR DRIVER
@@ -208,10 +206,10 @@ L298N MOTOR DRIVER
 
 LEDs
     ↓
-  D13 (GPIO13) → LEFT_LED (100mA max)
-  D2  (GPIO2)  → RIGHT_LED (100mA max)
-  D19 (GPIO19) → CH6_LED (100mA max)
-  D18 (GPIO5)  → BRIGHTNESS_LED (PWM, 100mA max)
+  D23 (GPIO23) → LEFT_LED (100mA max)
+  D21 (GPIO21) → RIGHT_LED (100mA max)
+  D22 (GPIO22) → CH6_LED (100mA max)
+  D5 (GPIO5)   → BRIGHTNESS_LED (PWM, 100mA max)
 ```
 
 ---
