@@ -64,9 +64,7 @@ float smoothThrottle = 0, smoothSteering = 0;
 int readChannel(int pin) {
   int val = pulseIn(pin, HIGH, 25000);
   if (val == 0) {
-    Serial.print("TIMEOUT on GPIO ");
-    Serial.println(pin);
-    return 1500; // failsafe
+    return 1500; // failsafe - return center value
   }
   return val;
 }
@@ -117,15 +115,6 @@ float smooth(float current, float target) {
 
 // Motor control with proper throttle priority and minimum threshold
 void controlMotors(int throttle, int steering) {
-  // Apply minimum PWM threshold to throttle when there's any input
-  // Prevents motors from being sluggish at low stick inputs
-  if (throttle > 0 && throttle < 80) {
-    throttle = 80;  // Minimum forward threshold
-  } 
-  else if (throttle < 0 && throttle > -80) {
-    throttle = -80; // Minimum backward threshold
-  }
-  
   int left = throttle - steering;
   int right = throttle + steering;
 
@@ -133,26 +122,44 @@ void controlMotors(int throttle, int steering) {
   left = constrain(left, -255, 255);
   right = constrain(right, -255, 255);
 
-  // LEFT MOTOR
-  if (left >= 0) {
+  // LEFT MOTOR (IN1, IN2, ENA)
+  // IN1=LOW, IN2=HIGH → Forward
+  // IN1=HIGH, IN2=LOW → Backward
+  if (left > 0) {
+    // Forward
     digitalWrite(IN1, LOW);
     digitalWrite(IN2, HIGH);
     ledcWrite(MOTOR_PWM_CHANNEL_A, left);
-  } else {
+  } else if (left < 0) {
+    // Backward
     digitalWrite(IN1, HIGH);
     digitalWrite(IN2, LOW);
     ledcWrite(MOTOR_PWM_CHANNEL_A, -left);
+  } else {
+    // Stop
+    digitalWrite(IN1, LOW);
+    digitalWrite(IN2, LOW);
+    ledcWrite(MOTOR_PWM_CHANNEL_A, 0);
   }
 
-  // RIGHT MOTOR
-  if (right >= 0) {
+  // RIGHT MOTOR (IN3, IN4, ENB)
+  // IN3=LOW, IN4=HIGH → Forward
+  // IN3=HIGH, IN4=LOW → Backward
+  if (right > 0) {
+    // Forward
     digitalWrite(IN3, LOW);
     digitalWrite(IN4, HIGH);
     ledcWrite(MOTOR_PWM_CHANNEL_B, right);
-  } else {
+  } else if (right < 0) {
+    // Backward
     digitalWrite(IN3, HIGH);
     digitalWrite(IN4, LOW);
     ledcWrite(MOTOR_PWM_CHANNEL_B, -right);
+  } else {
+    // Stop
+    digitalWrite(IN3, LOW);
+    digitalWrite(IN4, LOW);
+    ledcWrite(MOTOR_PWM_CHANNEL_B, 0);
   }
 }
 
@@ -906,7 +913,7 @@ void handleData() {
 
 void setup() {
   Serial.begin(115200);
-  Serial.println("Starting Multi-LED + Motor Controller...");
+  delay(1000);
 
   // Receiver pins setup
   pinMode(CH1, INPUT);
@@ -919,25 +926,6 @@ void setup() {
   pinMode(RIGHT_LED, OUTPUT);
   pinMode(CH6_LED, OUTPUT);
   pinMode(BRIGHTNESS_LED, OUTPUT);
-  
-  Serial.println("\nTesting LEDs...");
-  // Test all LEDs
-  Serial.println("LED Test: Left (GPIO13)...");
-  digitalWrite(LEFT_LED, HIGH);
-  delay(300);
-  digitalWrite(LEFT_LED, LOW);
-  
-  Serial.println("LED Test: Right (GPIO2)...");
-  digitalWrite(RIGHT_LED, HIGH);
-  delay(300);
-  digitalWrite(RIGHT_LED, LOW);
-  
-  Serial.println("LED Test: CH6 Toggle (GPIO19)...");
-  digitalWrite(CH6_LED, HIGH);
-  delay(300);
-  digitalWrite(CH6_LED, LOW);
-  
-  Serial.println("LED tests complete.");
 
   // Motor pins setup
   pinMode(IN1, OUTPUT);
@@ -957,6 +945,7 @@ void setup() {
   ledcSetup(MOTOR_PWM_CHANNEL_B, PWM_FREQ, PWM_RES);
   ledcAttachPin(ENB, MOTOR_PWM_CHANNEL_B);
 
+  Serial.println("\n\n=== ATOM RC Controller ===");
   Serial.print("Connecting to WiFi: ");
   Serial.println(ssid);
   WiFi.begin(ssid, password);
@@ -968,19 +957,20 @@ void setup() {
     attempts++;
   }
 
+  Serial.println();
   if (WiFi.status() == WL_CONNECTED) {
-    Serial.println("\nWiFi connected!");
+    Serial.println("WiFi connected!");
     Serial.print("IP Address: ");
     Serial.println(WiFi.localIP());
   } else {
-    Serial.println("\nWiFi connection failed!");
+    Serial.println("WiFi connection failed!");
   }
 
   server.on("/", handleRoot);
   server.on("/data", handleData);
 
   server.begin();
-  Serial.println("Web server started.");
+  Serial.println("Web server started.\n");
 }
 
 void loop() {
@@ -992,34 +982,11 @@ void loop() {
   ch5Value = readChannel(CH5);
   ch6Value = readChannel(CH6);
   
-  // Map channels to motor values - CH1 for steering, CH2 for throttle (BEFORE smoothing - for debug)
-  int throttle_before_smooth = map(ch2Value, 1000, 2000, -255, 255);
+  // Map channels to motor values
+  // CH1 (Steering): 1000-2000µs → -255 to +255 (left to right)
+  // CH2 (Throttle): 1000-2000µs → -255 to +255 (reverse to forward)
   int steering_before_smooth = map(ch1Value, 1000, 2000, -255, 255);
-  
-  // Debug output
-  static unsigned long lastDebug = 0;
-  if (millis() - lastDebug > 500) {
-    Serial.println("\n===== THROTTLE DEBUG =====");
-    Serial.print("CH2 RAW PULSE: "); Serial.print(ch2Value); Serial.println("µs");
-    Serial.print("Throttle AFTER MAPPING: "); Serial.println(throttle_before_smooth);
-    Serial.print("Throttle AFTER DEADZONE: "); Serial.println(throttle);
-    Serial.print("Throttle AFTER SMOOTH: "); Serial.print(smoothThrottle); Serial.println(" (float)");
-    Serial.print("Throttle CAST TO INT: "); Serial.println((int)smoothThrottle);
-    
-    Serial.println("\n===== STEERING DEBUG =====");
-    Serial.print("CH1 RAW PULSE: "); Serial.print(ch1Value); Serial.println("µs");
-    Serial.print("Steering AFTER MAPPING: "); Serial.println(steering_before_smooth);
-    Serial.print("Steering AFTER DEADZONE: "); Serial.println(steering);
-    Serial.print("Steering AFTER SMOOTH: "); Serial.print(smoothSteering); Serial.println(" (float)");
-    Serial.print("Steering CAST TO INT: "); Serial.println((int)smoothSteering);
-    
-    Serial.println("\n===== MOTOR COMMAND =====");
-    Serial.print("LEFT MOTOR PWM: "); Serial.println((int)smoothThrottle - (int)smoothSteering);
-    Serial.print("RIGHT MOTOR PWM: "); Serial.println((int)smoothThrottle + (int)smoothSteering);
-    Serial.println("========================\n");
-    
-    lastDebug = millis();
-  }
+  int throttle_before_smooth = map(ch2Value, 1000, 2000, -255, 255);
 
   // Determine toggle state based on CH5 value
   // UP: > 1750µs, MIDDLE: 1250-1750µs, DOWN: < 1250µs
@@ -1033,18 +1000,36 @@ void loop() {
     toggleState = 0;  // Toggle MIDDLE - No LED
   }
 
-  // Map channels to motor values - CH1 for steering, CH2 for throttle
+  // Assign to global variables
   steering = steering_before_smooth;
   throttle = throttle_before_smooth;
 
-  // Dead zone with proper threshold (~100µs = ±50 PWM)
-  // This prevents noise from affecting throttle
-  if (abs(throttle) < 50) throttle = 0;  // Increased from 20 to 50
+  // Dead zone only for steering (steering is more sensitive to noise)
   if (abs(steering) < 20) steering = 0;
 
-  // Smooth
-  smoothThrottle = smooth(smoothThrottle, throttle);
+  // Smooth only steering, not throttle (throttle needs immediate response)
   smoothSteering = smooth(smoothSteering, steering);
+  smoothThrottle = throttle;  // No smoothing for throttle - direct response
+
+  // Debug output every 500ms
+  static unsigned long lastDebug = 0;
+  if (millis() - lastDebug > 500) {
+    Serial.print("CH1:");
+    Serial.print(ch1Value);
+    Serial.print(" CH2:");
+    Serial.print(ch2Value);
+    Serial.print(" | Raw Throttle:");
+    Serial.print(throttle_before_smooth);
+    Serial.print(" After Deadzone:");
+    Serial.print(throttle);
+    Serial.print(" After Smooth:");
+    Serial.print((int)smoothThrottle);
+    Serial.print(" | Left Motor:");
+    Serial.print((int)smoothThrottle - (int)smoothSteering);
+    Serial.print(" Right Motor:");
+    Serial.println((int)smoothThrottle + (int)smoothSteering);
+    lastDebug = millis();
+  }
 
   // Control all LEDs
   controlLEDs(toggleState);
